@@ -1,0 +1,9 @@
+# AlertIQ
+.env
+*.db
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+.pytest_cache/
