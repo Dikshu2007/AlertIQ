@@ -2,7 +2,9 @@ const TOKEN_KEY = 'alertiq_token'
 const API_BASE_URL_KEY = 'alertiq_api_base_url'
 
 export function getApiBaseUrl(): string {
-  return (localStorage.getItem(API_BASE_URL_KEY) || '').trim().replace(/\/+$/, '')
+  const savedUrl = localStorage.getItem(API_BASE_URL_KEY)
+  const defaultUrl = import.meta.env.VITE_API_BASE_URL || ''
+  return (savedUrl ?? defaultUrl).trim().replace(/\/+$/, '')
 }
 
 export function saveApiBaseUrl(url: string) {

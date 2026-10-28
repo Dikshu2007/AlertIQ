@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: alertiq-dikshu2007-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEMO_MODE
+        value: "true"
+      - key: CORS_ORIGINS
+        value: "https://alertiq-dikshu2007-web.onrender.com,http://localhost:5173,http://localhost:4173,capacitor://localhost,http://localhost,https://localhost"
+
+  - type: web
+    name: alertiq-dikshu2007-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://alertiq-dikshu2007-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
