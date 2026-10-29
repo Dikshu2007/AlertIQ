@@ -47,4 +47,6 @@ async def receive(token: str, request: Request, background: BackgroundTasks,
     result = ingest_alerts(db, valid, source="webhook")
     schedule_post_ingest(background, db, result["alert_ids"])
     return {"imported": result["imported"], "duplicates": result["duplicates"],
-            "alert_ids": result["alert_ids"], "errors": errors[:20]}
+            "alert_ids": result["alert_ids"], "errors": errors[:20],
+            "auto_acknowledged": result["auto_acknowledged"],
+            "auto_resolved": result["auto_resolved"]}

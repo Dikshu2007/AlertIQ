@@ -47,6 +47,15 @@ class Alert(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class AlertAutomationPolicy(Base):
+    """Workspace-wide, event-driven status automation controls."""
+    __tablename__ = "alert_automation_policies"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    auto_ack_low_info: Mapped[bool] = mapped_column(Boolean, default=True)
+    auto_resolve_recovery_events: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class Incident(Base):
     __tablename__ = "incidents"
     id: Mapped[int] = mapped_column(primary_key=True)

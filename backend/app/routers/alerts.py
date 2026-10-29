@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File, Response
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -20,12 +20,15 @@ router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
 
 @router.post("", response_model=AlertOut, status_code=201)
-def create_alert(alert: AlertIn, background: BackgroundTasks, db: Session = Depends(get_db),
+def create_alert(alert: AlertIn, response: Response, background: BackgroundTasks, db: Session = Depends(get_db),
                  user: int = Depends(get_current_user)):
     valid, errors = normalize_many([alert.model_dump()])
     if errors:
         raise HTTPException(status_code=422, detail=errors[0])
     result = ingest_alerts(db, valid)
+    if not result["alert_ids"] and result["auto_resolved_ids"]:
+        response.status_code = 200
+        return db.get(Alert, result["auto_resolved_ids"][0])
     if not result["alert_ids"]:
         raise HTTPException(status_code=409, detail="Duplicate alert (same fingerprint within the dedupe window)")
     schedule_post_ingest(background, db, result["alert_ids"])
@@ -40,7 +43,9 @@ def create_alerts_batch(body: AlertListIn, background: BackgroundTasks, db: Sess
     result = ingest_alerts(db, valid)
     schedule_post_ingest(background, db, result["alert_ids"])
     return {"imported": result["imported"], "duplicates": result["duplicates"],
-            "alert_ids": result["alert_ids"], "errors": errors[:20]}
+            "alert_ids": result["alert_ids"], "errors": errors[:20],
+            "auto_acknowledged": result["auto_acknowledged"],
+            "auto_resolved": result["auto_resolved"]}
 
 
 @router.get("", response_model=AlertListOut)
@@ -127,7 +132,8 @@ def import_csv(background: BackgroundTasks, file: UploadFile = File(...), db: Se
     correlated = correlate_alerts_for_csv(db, saved) if len(saved) >= 2 else []
     schedule_post_ingest(background, db, result["alert_ids"], incidents=correlated)
     return CSVImportResult(imported=result["imported"], skipped=result["duplicates"] + len(errors),
-                           errors=errors[:20])
+                           errors=errors[:20], auto_acknowledged=result["auto_acknowledged"],
+                           auto_resolved=result["auto_resolved"])
 
 
 @router.get("/{alert_id}", response_model=AlertOut)

@@ -2,6 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { api, Alert, sevColor } from '../api'
 import { Badge, EmptyState, ErrorState, Loading } from '../components/ui'
 
+interface AutomationSettings {
+  auto_ack_low_info: boolean
+  auto_resolve_recovery_events: boolean
+}
+
 interface Analysis {
   summary: string; severity_assessment: string; possible_root_cause: string
   evidence: string[]; observed_patterns: string[]; possible_causes: string[]
@@ -41,6 +46,12 @@ export default function AlertsPage() {
   const [demoCompany, setDemoCompany] = useState('')
   const [generatingDemo, setGeneratingDemo] = useState(false)
   const [demoMsg, setDemoMsg] = useState('')
+  const [automation, setAutomation] = useState<AutomationSettings>({
+    auto_ack_low_info: true,
+    auto_resolve_recovery_events: true,
+  })
+  const [automationSaving, setAutomationSaving] = useState(false)
+  const [automationMessage, setAutomationMessage] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback((p = page, f = filters) => {
@@ -57,6 +68,26 @@ export default function AlertsPage() {
   }, [page, filters])
 
   useEffect(() => { load(page, filters) }, [page])
+
+  useEffect(() => {
+    api<AutomationSettings>('/api/automation/settings')
+      .then(setAutomation)
+      .catch(e => setAutomationMessage(`Could not load automation settings: ${e.message}`))
+  }, [])
+
+  const updateAutomation = async (key: keyof AutomationSettings, enabled: boolean) => {
+    const next = { ...automation, [key]: enabled }
+    setAutomation(next); setAutomationSaving(true); setAutomationMessage('')
+    try {
+      setAutomation(await api<AutomationSettings>('/api/automation/settings', {
+        method: 'PUT', body: JSON.stringify(next),
+      }))
+      setAutomationMessage('Workspace automation settings saved.')
+    } catch (e: any) {
+      setAutomationMessage(`Could not save automation settings: ${e.message}`)
+      api<AutomationSettings>('/api/automation/settings').then(setAutomation).catch(() => {})
+    } finally { setAutomationSaving(false) }
+  }
 
   const openDetail = async (a: Alert) => {
     setSelected(a); setAnalysis(null); setHistory(null)
@@ -77,8 +108,8 @@ export default function AlertsPage() {
     setImporting(true); setImportMsg('')
     const fd = new FormData(); fd.append('file', file)
     try {
-      const r = await api<{ imported: number; skipped: number; errors: string[] }>('/api/alerts/import-csv', { method: 'POST', body: fd })
-      setImportMsg(`Imported ${r.imported} alerts (${r.skipped} skipped).${r.errors.length ? ' Errors: ' + r.errors.slice(0, 3).join('; ') : ''}`)
+      const r = await api<{ imported: number; skipped: number; errors: string[]; auto_acknowledged?: number; auto_resolved?: number }>('/api/alerts/import-csv', { method: 'POST', body: fd })
+      setImportMsg(`Imported ${r.imported} alerts (${r.skipped} skipped). Automation: ${r.auto_acknowledged || 0} acknowledged, ${r.auto_resolved || 0} resolved.${r.errors.length ? ' Errors: ' + r.errors.slice(0, 3).join('; ') : ''}`)
       load(1, filters)
     } catch (e: any) { setImportMsg(`Import failed: ${e.message}`) } finally { setImporting(false) }
   }
@@ -87,13 +118,17 @@ export default function AlertsPage() {
     e.preventDefault()
     setCreating(true); setCreateError(''); setCreateMsg('')
     try {
-      await api<Alert>('/api/alerts', {
+      const created = await api<Alert>('/api/alerts', {
         method: 'POST',
         body: JSON.stringify({ ...createForm, source: 'manual' }),
       })
       setCreateForm({ service_name: '', title: '', description: '' })
       setShowCreate(false)
-      setCreateMsg('Alert added successfully.')
+      setCreateMsg(created.status === 'acknowledged'
+        ? 'Alert added and automatically acknowledged by the workspace rule.'
+        : created.status === 'resolved'
+          ? 'Alert added as resolved from an explicit recovery event.'
+          : 'Alert added successfully.')
       setPage(1)
       load(1, filters)
     } catch (e: any) {
@@ -121,7 +156,7 @@ export default function AlertsPage() {
     ]
     setGeneratingDemo(true); setDemoMsg('')
     try {
-      const result = await api<{ imported: number; duplicates: number; errors: string[] }>('/api/alerts/batch', {
+      const result = await api<{ imported: number; duplicates: number; errors: string[]; auto_acknowledged?: number; auto_resolved?: number }>('/api/alerts/batch', {
         method: 'POST',
         body: JSON.stringify({ alerts: scenarios.map(row => ({
           service_name: `${slug}-${row.service}`,
@@ -134,7 +169,7 @@ export default function AlertsPage() {
           metric_values: row.metrics,
         })) }),
       })
-      const msg = `Added ${result.imported} demo alerts for ${company}${result.duplicates ? ` (${result.duplicates} duplicates skipped)` : ''}.`
+      const msg = `Added ${result.imported} demo alerts for ${company}${result.duplicates ? ` (${result.duplicates} duplicates skipped)` : ''}. Automation: ${result.auto_acknowledged || 0} acknowledged, ${result.auto_resolved || 0} resolved.`
       setDemoMsg(msg)
       setDemoCompany('')
       setShowDemo(false)
@@ -176,6 +211,35 @@ export default function AlertsPage() {
           <a className="btn-ghost" href="/api/alerts/export.csv" target="_blank" rel="noreferrer">⬇ Export</a>
         </div>
       </div>
+
+      <section className="card border border-slate-700/70 space-y-3" aria-label="Alert automation settings">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="font-semibold">Alert status automation</h2>
+            <p className="text-xs text-slate-500 mt-1">Event-driven rules apply to new alerts from manual entry, CSV, webhooks, and integrations. These settings are shared across this workspace.</p>
+          </div>
+          <span className="text-xs text-slate-500">{automationSaving ? 'Saving…' : automationMessage}</span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="flex items-start gap-3 rounded-lg border border-slate-700 p-3 cursor-pointer">
+            <input type="checkbox" className="mt-1 accent-cyan-500" checked={automation.auto_ack_low_info}
+              disabled={automationSaving} onChange={e => updateAutomation('auto_ack_low_info', e.target.checked)} />
+            <span>
+              <span className="block text-sm font-medium">Auto-acknowledge low and info alerts</span>
+              <span className="block text-xs text-slate-500 mt-1">Routine alerts are acknowledged automatically. High, critical, and medium alerts stay open.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 rounded-lg border border-slate-700 p-3 cursor-pointer">
+            <input type="checkbox" className="mt-1 accent-emerald-500" checked={automation.auto_resolve_recovery_events}
+              disabled={automationSaving} onChange={e => updateAutomation('auto_resolve_recovery_events', e.target.checked)} />
+            <span>
+              <span className="block text-sm font-medium">Auto-resolve explicit recovery events</span>
+              <span className="block text-xs text-slate-500 mt-1">Only an explicit resolved/recovered/cleared/healthy/OK event can close a matching open alert. Severity alone never resolves an alert.</span>
+            </span>
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500">Every automatic status change records its action and reason in the alert labels. Incidents remain open until a responder resolves them.</p>
+      </section>
       {importMsg && <div className="card text-sm text-slate-300">{importMsg}</div>}
       {createMsg && <div className="card text-sm text-emerald-400">{createMsg}</div>}
       {demoMsg && <div className="card text-sm text-slate-300">{demoMsg}</div>}
@@ -302,6 +366,14 @@ export default function AlertsPage() {
               <Badge text={`service: ${selected.service_name}`} />
               <Badge text={`source: ${selected.source}`} />
             </div>
+            {selected.labels?.alertiq_automation && (
+              <div className="card border border-cyan-800/50 space-y-1">
+                <h3 className="font-semibold text-sm">Automatic status update</h3>
+                <p className="text-xs text-slate-400">
+                  {selected.labels.alertiq_automation.action?.replace(/_/g, ' ')} · {selected.labels.alertiq_automation.reason}
+                </p>
+              </div>
+            )}
             {selected.severity_assessment && (
               <div className="card space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">

@@ -55,13 +55,16 @@ def fetch_prometheus(integration: Integration) -> list[dict]:
     rows = []
     for a in (data.get("data", {}) or {}).get("alerts", []):
         labels = a.get("labels", {}) or {}
+        monitor_state = str(a.get("state") or "").strip().lower()
         rows.append({
             "service_name": labels.get("job") or labels.get("service") or labels.get("instance") or "unknown",
             "title": a.get("annotations", {}).get("summary") or labels.get("alertname") or "Prometheus alert",
             "description": a.get("annotations", {}).get("description", ""),
             "severity": labels.get("severity", "medium"),
-            "status": "open" if a.get("state") == "active" else "resolved",
-            "labels": labels,
+            # Prometheus /api/v1/alerts returns active alerts; disappearance
+            # from this polling response is not enough evidence to close one.
+            "status": "open",
+            "labels": {**labels, "monitor_state": monitor_state},
             "metric_values": {k: float(v) for k, v in (a.get("values", {}) or {}).items()
                               if isinstance(v, (int, float))},
             "timestamp": a.get("activeAt"),
@@ -81,13 +84,14 @@ def fetch_datadog(integration: Integration) -> list[dict]:
         resp = client.get(
             f"{base}/api/v1/monitor",
             headers={"DD-API-KEY": creds["api_key"], "DD-APPLICATION-KEY": creds["app_key"]},
-            params={"group_states": "alert"},
+            params={"group_states": "all"},
         )
         resp.raise_for_status()
         monitors = resp.json()
     rows = []
     for m in monitors[:100]:
-        if m.get("overall_state") not in ("Alert", "alert"):
+        monitor_state = str(m.get("overall_state") or "").strip().lower()
+        if monitor_state not in {"alert", "warn", "no data", "ok"}:
             continue
         tags = m.get("tags", []) or []
         service = next((t.split(":", 1)[1] for t in tags if t.startswith("service:")), "unknown")
@@ -96,7 +100,8 @@ def fetch_datadog(integration: Integration) -> list[dict]:
             "title": m.get("name", "Datadog monitor alert"),
             "description": m.get("message", "")[:2000],
             "severity": "high" if "critical" in str(m.get("overall_state", "")).lower() else "medium",
-            "labels": {"tags": tags, "monitor_id": m.get("id")},
+            "status": "resolved" if monitor_state == "ok" else "open",
+            "labels": {"tags": tags, "monitor_id": m.get("id"), "monitor_state": monitor_state},
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "source": "datadog",
             "external_id": f"dd-monitor-{m.get('id')}",
@@ -166,7 +171,9 @@ def sync_integration(db: Session, integration: Integration) -> dict:
         rows = CONNECTORS[integration.kind](integration)
         valid, errors = normalize_many(rows)
         result = ingest_alerts(db, valid, source=integration.kind)
-        _event(db, integration, "info", f"Sync OK: {result['imported']} ingested, {result['duplicates']} duplicates")
+        _event(db, integration, "info",
+               f"Sync OK: {result['imported']} ingested, {result['duplicates']} duplicates, "
+               f"{result['auto_acknowledged']} auto-acknowledged, {result['auto_resolved']} auto-resolved")
         db.commit()
         return {"ok": True, **result, "errors": errors[:10]}
     except Exception as exc:  # noqa: BLE001

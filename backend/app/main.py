@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.database import Base, engine, SessionLocal
-from app.routers import ai, alerts, auth, dashboard, feedback, incidents, integrations, services, webhooks, ws
+from app.routers import ai, alerts, auth, automation, dashboard, feedback, incidents, integrations, services, webhooks, ws
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -56,6 +56,7 @@ with SessionLocal() as db:
         )
 
 app.include_router(auth.router)
+app.include_router(automation.router)
 app.include_router(alerts.router)
 app.include_router(incidents.router)
 app.include_router(services.router)

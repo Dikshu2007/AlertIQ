@@ -77,6 +77,11 @@ class AlertStatusUpdate(BaseModel):
     status: str = Field(pattern="^(open|acknowledged|resolved)$")
 
 
+class AlertAutomationSettings(BaseModel):
+    auto_ack_low_info: bool = True
+    auto_resolve_recovery_events: bool = True
+
+
 class AlertListIn(BaseModel):
     """Envelope for batch ingest; raw dicts let the normalizer skip invalid rows."""
     alerts: list[dict] = Field(min_length=1, max_length=1000)
@@ -86,6 +91,8 @@ class CSVImportResult(BaseModel):
     imported: int
     skipped: int
     errors: list[str]
+    auto_acknowledged: int = 0
+    auto_resolved: int = 0
 
 
 # ------------------------------------------------------------------- incidents
