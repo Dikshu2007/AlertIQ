@@ -144,9 +144,9 @@ export default function AlertsPage() {
     if (!company) return
     const slug = company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 55) || 'sample-saas'
     const scenarios = [
-      { service: 'api', title: 'Routine API latency warning', hoursAgo: 120, status: 'resolved', description: `${company} API had a brief latency increase during a routine traffic peak.`, metrics: { latency_p95_ms: 420 } },
-      { service: 'database', title: 'Database replication lag observed', hoursAgo: 96, status: 'resolved', description: `Replication lag returned to normal for ${company}.`, metrics: { replication_lag_seconds: 3 } },
-      { service: 'auth', title: 'Token refresh latency elevated', hoursAgo: 72, status: 'resolved', description: `${company} authentication recovered without customer impact.`, metrics: { latency_p95_ms: 310 } },
+      { service: 'api', title: 'Informational health check completed', hoursAgo: 120, status: 'open', description: `${company} API health check completed successfully.`, metrics: {} },
+      { service: 'database', title: 'Database replication lag observed', hoursAgo: 96, status: 'open', description: `Replication lag was observed for ${company}.`, metrics: { replication_lag_seconds: 3 } },
+      { service: 'database', title: 'Database replication lag observed', hoursAgo: 95, status: 'resolved', description: `Monitor reports database replication recovered for ${company}.`, labels: { alert_state: 'recovered' }, metrics: { replication_lag_seconds: 3 } },
       { service: 'api', title: 'API 5xx error rate rising', hoursAgo: 0.2, status: 'open', description: `Simulated spike in server errors across ${company} API requests.`, metrics: { error_rate_pct: 8.6, requests_per_minute: 12400 } },
       { service: 'database', title: 'Database connection pool near capacity', hoursAgo: 0.25, status: 'open', description: `Simulated connection pressure affecting ${company} application services.`, metrics: { connections_used: 94, connections_max: 100 } },
       { service: 'billing', title: 'Billing webhook retry backlog growing', hoursAgo: 0.35, status: 'open', description: `Payment provider callbacks are retrying and accumulating for ${company}.`, metrics: { retry_queue_depth: 860 } },
@@ -165,11 +165,11 @@ export default function AlertsPage() {
           status: row.status,
           source: 'demo',
           timestamp: new Date(Date.now() - row.hoursAgo * 60 * 60 * 1000).toISOString(),
-          labels: { demo: true, demo_company: company, scenario: 'saas-sample' },
+          labels: { demo: true, demo_company: company, scenario: 'saas-sample', ...(row.labels || {}) },
           metric_values: row.metrics,
         })) }),
       })
-      const msg = `Added ${result.imported} demo alerts for ${company}${result.duplicates ? ` (${result.duplicates} duplicates skipped)` : ''}. Automation: ${result.auto_acknowledged || 0} acknowledged, ${result.auto_resolved || 0} resolved.`
+      const msg = `Processed ${scenarios.length} demo events for ${company}: ${result.imported} alerts created${result.duplicates ? `, ${result.duplicates} duplicates skipped` : ''}. Automation: ${result.auto_acknowledged || 0} acknowledged, ${result.auto_resolved || 0} resolved.`
       setDemoMsg(msg)
       setDemoCompany('')
       setShowDemo(false)
