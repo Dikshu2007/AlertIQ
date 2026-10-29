@@ -4,6 +4,12 @@ AI-powered intelligent incident monitoring and decision-support platform.
 
 FastAPI backend · React + Vite + TypeScript + Tailwind CSS frontend · SQLite (swap to PostgreSQL via `DATABASE_URL`).
 
+## Project links
+
+- **Live demo:** https://alertiq-dikshu2007-web.onrender.com/
+- **Public source repository:** https://github.com/Dikshu2007/AlertIQ
+- **Host account mirror:** https://github.com/hackbridge-dev1/hackbridge-TEAM-1F09QM
+
 ## What it does
 
 - **Ingests alerts** from your monitoring stack: REST API, batch endpoint, generic webhooks (token-authenticated), CSV upload, Prometheus, Datadog, GitHub CI.
