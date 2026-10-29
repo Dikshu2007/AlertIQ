@@ -36,7 +36,7 @@ export default function AlertsPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   const [createMsg, setCreateMsg] = useState('')
-  const [createForm, setCreateForm] = useState({ service_name: '', title: '', description: '', severity: 'medium' })
+  const [createForm, setCreateForm] = useState({ service_name: '', title: '', description: '' })
   const [showDemo, setShowDemo] = useState(false)
   const [demoCompany, setDemoCompany] = useState('')
   const [generatingDemo, setGeneratingDemo] = useState(false)
@@ -91,7 +91,7 @@ export default function AlertsPage() {
         method: 'POST',
         body: JSON.stringify({ ...createForm, source: 'manual' }),
       })
-      setCreateForm({ service_name: '', title: '', description: '', severity: 'medium' })
+      setCreateForm({ service_name: '', title: '', description: '' })
       setShowCreate(false)
       setCreateMsg('Alert added successfully.')
       setPage(1)
@@ -109,15 +109,15 @@ export default function AlertsPage() {
     if (!company) return
     const slug = company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 55) || 'sample-saas'
     const scenarios = [
-      { service: 'api', title: 'Routine API latency warning', severity: 'info', hoursAgo: 120, status: 'resolved', description: `${company} API had a brief latency increase during a routine traffic peak.`, metrics: { latency_p95_ms: 420 } },
-      { service: 'database', title: 'Database replication lag observed', severity: 'low', hoursAgo: 96, status: 'resolved', description: `Replication lag returned to normal for ${company}.`, metrics: { replication_lag_seconds: 3 } },
-      { service: 'auth', title: 'Token refresh latency elevated', severity: 'info', hoursAgo: 72, status: 'resolved', description: `${company} authentication recovered without customer impact.`, metrics: { latency_p95_ms: 310 } },
-      { service: 'api', title: 'API 5xx error rate rising', severity: 'critical', hoursAgo: 0.2, status: 'open', description: `Simulated spike in server errors across ${company} API requests.`, metrics: { error_rate_pct: 8.6, requests_per_minute: 12400 } },
-      { service: 'database', title: 'Database connection pool near capacity', severity: 'critical', hoursAgo: 0.25, status: 'open', description: `Simulated connection pressure affecting ${company} application services.`, metrics: { connections_used: 94, connections_max: 100 } },
-      { service: 'billing', title: 'Billing webhook retry backlog growing', severity: 'high', hoursAgo: 0.35, status: 'open', description: `Payment provider callbacks are retrying and accumulating for ${company}.`, metrics: { retry_queue_depth: 860 } },
-      { service: 'auth', title: 'Login requests slower than baseline', severity: 'high', hoursAgo: 0.45, status: 'open', description: `Customers may see slower sign-in while ${company} authentication is under load.`, metrics: { latency_p95_ms: 1850 } },
-      { service: 'web', title: 'Customer dashboard page load degraded', severity: 'medium', hoursAgo: 0.55, status: 'open', description: `The ${company} web app is responding slowly, possibly related to API latency.`, metrics: { page_load_p95_ms: 3200 } },
-      { service: 'queue', title: 'Background job queue depth increasing', severity: 'high', hoursAgo: 0.65, status: 'open', description: `Background work is falling behind for ${company}; inspect workers and downstream dependencies.`, metrics: { queue_depth: 2400 } },
+      { service: 'api', title: 'Routine API latency warning', hoursAgo: 120, status: 'resolved', description: `${company} API had a brief latency increase during a routine traffic peak.`, metrics: { latency_p95_ms: 420 } },
+      { service: 'database', title: 'Database replication lag observed', hoursAgo: 96, status: 'resolved', description: `Replication lag returned to normal for ${company}.`, metrics: { replication_lag_seconds: 3 } },
+      { service: 'auth', title: 'Token refresh latency elevated', hoursAgo: 72, status: 'resolved', description: `${company} authentication recovered without customer impact.`, metrics: { latency_p95_ms: 310 } },
+      { service: 'api', title: 'API 5xx error rate rising', hoursAgo: 0.2, status: 'open', description: `Simulated spike in server errors across ${company} API requests.`, metrics: { error_rate_pct: 8.6, requests_per_minute: 12400 } },
+      { service: 'database', title: 'Database connection pool near capacity', hoursAgo: 0.25, status: 'open', description: `Simulated connection pressure affecting ${company} application services.`, metrics: { connections_used: 94, connections_max: 100 } },
+      { service: 'billing', title: 'Billing webhook retry backlog growing', hoursAgo: 0.35, status: 'open', description: `Payment provider callbacks are retrying and accumulating for ${company}.`, metrics: { retry_queue_depth: 860 } },
+      { service: 'auth', title: 'Login requests slower than baseline', hoursAgo: 0.45, status: 'open', description: `Customers may see slower sign-in while ${company} authentication is under load.`, metrics: { latency_p95_ms: 1850 } },
+      { service: 'web', title: 'Customer dashboard page load degraded', hoursAgo: 0.55, status: 'open', description: `The ${company} web app is responding slowly, possibly related to API latency.`, metrics: { page_load_p95_ms: 3200 } },
+      { service: 'queue', title: 'Background job queue depth increasing', hoursAgo: 0.65, status: 'open', description: `Background work is falling behind for ${company}; inspect workers and downstream dependencies.`, metrics: { queue_depth: 2400 } },
     ]
     setGeneratingDemo(true); setDemoMsg('')
     try {
@@ -127,7 +127,6 @@ export default function AlertsPage() {
           service_name: `${slug}-${row.service}`,
           title: row.title,
           description: row.description,
-          severity: row.severity,
           status: row.status,
           source: 'demo',
           timestamp: new Date(Date.now() - row.hoursAgo * 60 * 60 * 1000).toISOString(),
@@ -207,14 +206,8 @@ export default function AlertsPage() {
                 onChange={e => setCreateForm({ ...createForm, service_name: e.target.value })}
                 placeholder="e.g. checkout-api" />
             </label>
-            <label className="text-xs text-slate-500 space-y-1">
-              <span>Severity</span>
-              <select className="input" value={createForm.severity}
-                onChange={e => setCreateForm({ ...createForm, severity: e.target.value })}>
-                {['critical', 'high', 'medium', 'low', 'info'].map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
           </div>
+          <p className="text-xs text-slate-500">AlertIQ assigns severity automatically from the alert text and any metrics provided.</p>
           <label className="block text-xs text-slate-500 space-y-1">
             <span>Title</span>
             <input className="input" required maxLength={500} value={createForm.title}
@@ -309,6 +302,22 @@ export default function AlertsPage() {
               <Badge text={`service: ${selected.service_name}`} />
               <Badge text={`source: ${selected.source}`} />
             </div>
+            {selected.severity_assessment && (
+              <div className="card space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-semibold text-sm">Automated severity assessment</h3>
+                  <span className="text-xs text-slate-500">
+                    {selected.severity_assessment.method} · {Math.round((selected.severity_assessment.match_strength ?? selected.severity_assessment.confidence ?? 0) * 100)}% rule match
+                  </span>
+                </div>
+                <p className="text-sm text-slate-300">Assigned <strong>{selected.severity_assessment.severity}</strong>: {selected.severity_assessment.reason}</p>
+                {selected.severity_assessment.evidence?.length > 0 && (
+                  <ul className="list-disc pl-5 space-y-1 text-xs text-slate-400">
+                    {selected.severity_assessment.evidence.map((item, index) => <li key={index}>{item}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
             {selected.description && <p className="text-sm text-slate-300 whitespace-pre-wrap">{selected.description}</p>}
             {Object.keys(selected.metric_values).length > 0 && (
               <div>

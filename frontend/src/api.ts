@@ -58,6 +58,7 @@ export interface Alert {
   id: number; source: string; service_name: string; title: string; description: string
   severity: string; status: string; labels: Record<string, any>; metric_values: Record<string, number>
   timestamp: string
+  severity_assessment?: { severity: string; reason: string; evidence: string[]; match_strength?: number; confidence?: number; method: string }
 }
 export interface Incident {
   id: number; title: string; description: string; severity: string; status: string

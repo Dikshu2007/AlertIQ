@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.database import Base, engine
+from app.database import Base, engine, SessionLocal
 from app.routers import ai, alerts, auth, dashboard, feedback, incidents, integrations, services, webhooks, ws
 
 logging.basicConfig(level=logging.INFO,
@@ -44,6 +44,16 @@ Base.metadata.create_all(bind=engine)
 if settings.demo_mode:
     from app.seed import seed_if_empty
     seed_if_empty()
+
+# One-time backfill for alerts created before automated severity assessments.
+from app.services.severity_classifier import backfill_existing_alerts
+
+with SessionLocal() as db:
+    migrated_alerts = backfill_existing_alerts(db)
+    if migrated_alerts:
+        logging.getLogger("alertiq.api").info(
+            "Backfilled automated severity for %s existing alerts", migrated_alerts
+        )
 
 app.include_router(auth.router)
 app.include_router(alerts.router)

@@ -72,7 +72,6 @@ def normalize_alert(raw: dict) -> dict:
     if len(service) > 120:
         raise ValidationError("service_name too long")
 
-    severity = normalize_severity(raw.get("severity"))
     status = str(raw.get("status") or "open").strip().lower()
     if status not in VALID_STATUS:
         status = "open"
@@ -85,6 +84,11 @@ def normalize_alert(raw: dict) -> dict:
     }
 
     description = str(raw.get("description") or "")[:MAX_STR]
+    # Severity is always assigned by AlertIQ from the alert content and metrics;
+    # any sender-provided severity is intentionally not treated as ground truth.
+    from app.services.severity_classifier import classify_severity
+    assessment = classify_severity(title, description, metric_values)
+    labels = {**labels, "alertiq_severity_assessment": assessment}
 
     return {
         "source": str(raw.get("source") or "api")[:50],
@@ -92,7 +96,7 @@ def normalize_alert(raw: dict) -> dict:
         "service_name": service,
         "title": title,
         "description": description,
-        "severity": severity,
+        "severity": assessment["severity"],
         "status": status,
         "labels": labels,
         "metric_values": metric_values,

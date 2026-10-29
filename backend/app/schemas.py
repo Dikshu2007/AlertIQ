@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
 
 
 class ORMModel(BaseModel):
@@ -28,7 +28,6 @@ class AlertIn(BaseModel):
     service_name: str = Field(min_length=1, max_length=120)
     title: str = Field(min_length=1, max_length=500)
     description: str = ""
-    severity: str = "medium"
     status: str = "open"
     source: str = "api"
     external_id: str | None = None
@@ -50,6 +49,21 @@ class AlertOut(ORMModel):
     labels: dict
     metric_values: dict
     timestamp: datetime
+
+    @computed_field
+    @property
+    def severity_assessment(self) -> dict:
+        assessment = (self.labels or {}).get("alertiq_severity_assessment")
+        if not assessment:
+            from app.services.severity_classifier import classify_severity
+            assessment = classify_severity(self.title, self.description or "", self.metric_values or {})
+        else:
+            assessment = dict(assessment)
+        # Support both the current UI's term and older bundles' field name.
+        strength = assessment.get("match_strength", assessment.get("confidence", 0.0))
+        assessment.setdefault("match_strength", strength)
+        assessment.setdefault("confidence", strength)
+        return assessment
 
 
 class AlertListOut(BaseModel):
